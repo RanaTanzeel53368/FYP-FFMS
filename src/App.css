@@ -1,0 +1,187 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+:root {
+  --white: #ffffff;
+  --black: #000;
+  --componentColor:#F8F8F8;
+  --mainColor:#185179;
+  --primaryColor:#2f6286;
+  --secondaryColor:#5d85a1;
+  --lightColor:#8ba8bc;
+
+}
+::-webkit-scrollbar{
+  width: 10px;
+}
+::-webkit-scrollbar-track{
+  background: var(--componentColor);
+}
+::-webkit-scrollbar-thumb{
+  background: var(--mainColor);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover{
+  background: var(--primaryColor);
+}
+a {
+  text-decoration: none;
+}
+
+.d_flex{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bg-component{
+  border-radius: 12px;
+  background-color: var(--componentColor);
+}
+input:focus-visible {
+  border: none;
+  outline: none;
+}
+.error{
+  color: red;
+}
+.login-button {
+  background-color: var(--mainColor) !important;
+  padding: 8px 16px !important;
+  outline: none !important;
+  border: none !important;
+  margin: auto; 
+}
+.btn-check:focus+.btn, .btn:focus {
+  outline: 0;
+  box-shadow: none !important;
+}
+.form-select:focus {
+  border-color: #86b7fe;
+  outline: 0;
+  box-shadow: none !important;
+}
+.login-button:hover {
+  background-color: var(--secondaryColor) !important;
+}
+
+.inner-card{
+  border-radius: 10px;
+  box-shadow: rgba(0, 0, 0, 0.15) 1.95px 1.95px 2.6px;
+}
+.pie-chart {
+  width: 50px;
+  height: 50px;
+}
+.card {
+  min-width: 300px !important;
+}
+.card-data {
+  margin-left: 1rem;
+}
+.card-container{
+  margin-top: 5rem;
+}
+.card{
+  background-image: url("./assets//card-design.png");
+  background-size: cover;
+}
+.line-chart{
+  margin-top: 9rem;
+}
+.image-section{
+  min-height: 200px;
+  border-radius: 20px;
+}
+.camera-icon{
+  font-size: 4rem !important ;
+}
+.login {
+  position: relative;
+}
+
+.sweet-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); 
+  z-index: 9999; 
+}
+.products_images img{
+  max-width: 50px;
+}
+.edit-product{
+  cursor: pointer;
+}
+.pagination {
+  display: flex;
+  padding-left: 0;
+  list-style: none;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 30px;
+}
+.login-bg{
+  background-color: var(--mainColor);
+}
+.signin-button{
+  background-color: transparent !important;
+  padding: 8px 10px !important;
+  color: var(--black) !important;
+}
+
+
+               /* dashboard cards */
+  .main-card{
+    border-left: 5px solid var(--mainColor);
+  }
+
+  .icons{
+    color: var(--primaryColor);
+  }
+  .bowl .bowl-icon{
+    color: var(--secondaryColor);
+  }
+  #hover-icon{
+    transition: all 0.3s ease-in;
+  }
+  #hover-icon:hover {
+    background-color: var(--lightColor);
+  }
+  .sensors-name{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sensors-name input{
+    border: 0;
+    background-color: var(--white);
+  }
+  .logo-section{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+
+
+
+
+
+
+
+
+
+
+
+@media screen and (max-width: 480px){
+  .MuiDrawer-root.MuiDrawer-docked.css-1r4mfv4-MuiDrawer-docked {
+    display: none;
+}
+}
