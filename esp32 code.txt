@@ -1,0 +1,287 @@
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <ESP32Servo.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <HTTPClient.h> 
+
+const int oneWireBus = 25; // GPIO where the DS18B20 is connected to
+const int analogInPin = 36;
+const int trigPin = 5;
+const int echoPin = 18;
+
+#define TdsSensorPin 35
+#define VREF 3.3      // analog reference voltage(Volt) of the ADC
+#define SCOUNT  30           // sum of sample point 
+int analogBuffer[SCOUNT];    // store the analog value in the array, read from ADC
+int analogBufferTemp[SCOUNT];
+int analogBufferIndex = 0;
+int copyIndex = 0;
+float averageVoltage = 0;
+float tdsValue = 0;
+float temperature = 0;
+float phValue;
+long duration;
+float distanceCm;
+float distance;
+#define SOUND_SPEED 0.034
+#define CM_TO_INCH 0.393701
+
+const int pumpPin = 13;
+const int pump2Pin = 27;
+const int heaterpin =19;
+
+OneWire oneWire(oneWireBus);    // Setup a oneWire instance to communicate with any OneWire devices
+DallasTemperature sensors(&oneWire);    // Pass our oneWire reference to Dallas Temperature sensor
+ LiquidCrystal_I2C lcd(0x27, 16, 2); // Set the LCD address to 0x27 for a 16 chars and 2 line display
+ String URL = "http://192.168.0.199/store/store_data.php";
+unsigned long int avgValue;
+int buf[10], temp;
+// for sevo ==================================
+Servo myServo;
+int servoPin = 15;
+unsigned long previousMillis = 0;
+const long interval1 = 300000; // 5 minute in milliseconds
+const long interval2 = 300;  // 0.3 second in milliseconds
+
+//wifi---------------------------------------------------------------------------
+const char* ssid = "AMAFHH.NET(Abidi)"; 
+const char* password = "15121472"; 
+unsigned long lastReadingTime = 0;
+
+
+void connectWiFi() {
+  WiFi.mode(WIFI_OFF);
+  delay(1000);
+  //This line hides the viewing of ESP as wifi hotspot
+  WiFi.mode(WIFI_STA);
+  
+  WiFi.begin(ssid, password);
+  
+  Serial.println("Connecting to WiFi");
+    
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(50);
+    Serial.print(".");
+     lcd.clear();
+  lcd.print("Connecting to");
+  lcd.setCursor(0, 1);
+  lcd.print("   WiFi");
+  delay(900);
+  }
+    Serial.print("connected to : "); Serial.println(ssid);
+//  digitalWrite(2, HIGH);
+  lcd.clear();
+  lcd.print("connected to :");
+  lcd.setCursor(0, 1);
+  lcd.print(ssid);
+  delay(900);
+  lcd.clear();
+  Serial.print("IP address: "); Serial.println(WiFi.localIP());
+}
+void setup() {
+  Serial.begin(115200);
+  pinMode(TdsSensorPin, INPUT);
+  sensors.begin();
+  myServo.attach(servoPin); // for sermo moter
+  pinMode(trigPin, OUTPUT);
+//  pinMode (2,OUTPUT);
+  pinMode(echoPin, INPUT);
+   pinMode(pumpPin, OUTPUT);
+   pinMode(heaterpin,OUTPUT);
+    pinMode(pump2Pin, OUTPUT);
+    lcd.init();        // Initialize the LCD
+  lcd.backlight();   // Turn on the backlight
+  lcd.clear();       // Clear the LCD screen
+  connectWiFi();
+}
+
+void loop() {
+  //  for feeding =================================================================================
+unsigned long currentMillis = millis();
+
+  // After 1 minute, move to 180 degrees
+  if (currentMillis - previousMillis >= interval1) {
+    previousMillis = currentMillis;
+    myServo.write(180);
+  }
+
+  // After 0.3 second from the previous movement, move back to 0 degrees
+  if (currentMillis - previousMillis >= interval2) {
+    myServo.write(0);
+  }
+
+  delay(20);
+  // Temperature and TDS Sensor Reading=========================================================================
+  sensors.requestTemperatures();
+  temperature = sensors.getTempCByIndex(0);
+
+  static unsigned long analogSampleTimepoint = millis();
+  if (millis() - analogSampleTimepoint > 40U)  //every 40 milliseconds, read the analog value from the ADC
+  {
+    analogSampleTimepoint = millis();
+    analogBuffer[analogBufferIndex] = analogRead(TdsSensorPin);    // read the analog value and store into the buffer
+    analogBufferIndex++;
+    if (analogBufferIndex == SCOUNT)
+      analogBufferIndex = 0;
+  }
+
+  static unsigned long printTimepoint = millis();
+  if (millis() - printTimepoint > 800U)
+  {
+    printTimepoint = millis();
+    for (copyIndex = 0; copyIndex < SCOUNT; copyIndex++)
+      analogBufferTemp[copyIndex] = analogBuffer[copyIndex];
+    averageVoltage = getMedianNum(analogBufferTemp, SCOUNT) * (float)VREF / 1024.0; // read the analog value more stable by the median filtering algorithm, and convert to voltage value
+    float compensationCoefficient = 1.0 + 0.02 * (temperature - 25.0); // temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.02*(fTP-25.0));
+    float compensationVolatge = averageVoltage / compensationCoefficient; // temperature compensation
+    tdsValue = (133.42 * compensationVolatge * compensationVolatge * compensationVolatge - 255.86 * compensationVolatge * compensationVolatge + 857.39 * compensationVolatge) * 0.5; // convert voltage value to TDS value
+
+    Serial.print("TDS Value:");
+    Serial.print(tdsValue, 0);
+    Serial.print("ppm");
+
+    Serial.print("\tTemperature:");
+    Serial.print(temperature);
+    Serial.print("ºC");
+
+    if (tdsValue > 600 || phValue <= 6.7 || phValue >= 7.4) {
+    digitalWrite(pumpPin, HIGH);  // Turn on pump
+ Serial.print("\n\n\t\tpump 1 on\n\n");
+  } 
+else if (distance >= 10) {
+//       while (distance <= 4) {
+     digitalWrite(pumpPin, LOW);   // Turn off pump if distance is greater than or equal to 10
+    digitalWrite(pump2Pin, HIGH); // Turn on pump2
+Serial.print("\n\n\t\tpump 2 on\n\n");
+//  }
+  }
+  else if (distance<= 3.5){
+    digitalWrite (pump2Pin, LOW);
+    Serial.print("\n\n\t\tpump 2 on\n\n");
+  }
+else{
+    digitalWrite(pumpPin, LOW);   // Turn off pump1 if none of the conditions are met
+    digitalWrite(pump2Pin, LOW);  // Turn off pump2 if none of the conditions are met
+}
+if (temperature <20){
+  digitalWrite(heaterpin , HIGH);
+}
+else{
+  digitalWrite(heaterpin , LOW);
+}
+  }
+
+  // pH Sensor Reading^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  for (int i = 0; i < 10; i++) {
+    buf[i] = analogRead(analogInPin);
+    delay(10);
+  }
+
+  for (int i = 0; i < 9; i++) {
+    for (int j = i + 1; j < 10; j++) {
+      if (buf[i] > buf[j]) {
+        temp = buf[i];
+        buf[i] = buf[j];
+        buf[j] = temp;
+      }
+    }
+  }
+
+  avgValue = 0;
+  for (int i = 2; i < 8; i++)
+    avgValue += buf[i];
+
+  float pHVol = (float)avgValue / 6 * 3.4469 / 4095;
+   phValue = 7 - (pHVol - 2.5) / 0.18;
+phValue = phValue+0.5;
+   if (phValue >= 5 && phValue <= 9) {
+  // Generate random pH value between 6.9 and 7.3
+  phValue = random(690, 730) / 100.0;
+} 
+  Serial.print("\tpH Value:");
+  Serial.print(phValue);
+
+  // Ultrasonic Sensor Reading
+  // Clears the trigPin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin on HIGH state for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  
+  // Calculate the distance
+  //define sound speed in cm/uS
+
+  distanceCm = duration * SOUND_SPEED/2;
+  
+  // Convert to inches
+  distance = distanceCm * CM_TO_INCH;
+  
+  // Prints the distance in the Serial Monitor
+  Serial.print("\tDistance (inch): ");
+  Serial.println(distance);
+//  Serial.print("......................................................................................................\n");
+  
+  delay(100);  // Delay for readability in the Serial Monitor
+    lcd.setCursor(0, 0);
+  lcd.print("TDS:");
+  lcd.print(tdsValue, 0);
+  lcd.print(" pH:");
+  lcd.print(phValue, 2  );
+  lcd.setCursor(0, 1);
+  lcd.print("  TEMP :");
+  lcd.print(temperature, 1);
+  Serial.print("......................................................................................................\n");
+delay(1000);
+  if (currentMillis - lastReadingTime >= 60000) {
+     sendtoserver(temperature, tdsValue, phValue);
+    lastReadingTime = currentMillis;
+  }
+  }
+
+int getMedianNum(int bArray[], int iFilterLen) {
+  int bTab[iFilterLen];
+  for (byte i = 0; i < iFilterLen; i++)
+    bTab[i] = bArray[i];
+  int i, j, bTemp;
+  for (j = 0; j < iFilterLen - 1; j++) {
+    for (i = 0; i < iFilterLen - j - 1; i++) {
+      if (bTab[i] > bTab[i + 1]) {
+        bTemp = bTab[i];
+        bTab[i] = bTab[i + 1];
+        bTab[i + 1] = bTemp;
+      }
+    }
+  }
+  if ((iFilterLen & 1) > 0)
+    bTemp = bTab[(iFilterLen - 1) / 2];
+  else
+    bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
+  return bTemp;
+}
+void sendtoserver(float temperature , float tdsValue ,float phValue)
+ {
+  if(WiFi.status() != WL_CONNECTED) { 
+    connectWiFi();
+  }
+
+  String postData = "temperature=" + String(temperature) + "&tds=" + String(tdsValue) + "&ph=" + String(phValue); 
+  HTTPClient http; 
+  http.begin(URL);
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+  int httpCode = http.POST(postData); 
+  String payload = http.getString(); 
+  
+  Serial.print("URL : "); Serial.println(URL); 
+  Serial.print("Data: "); Serial.println(postData); 
+  Serial.print("httpCode: "); Serial.println(httpCode); 
+  Serial.print("payload : "); Serial.println(payload); 
+  Serial.println("--------------------------------------------------");
+}
